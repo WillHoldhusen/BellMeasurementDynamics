@@ -18,3 +18,15 @@ function unpaired_sites(state)
     return count(iszero, state)
 end
 
+function count_rs(state)
+    N = length(state)
+    rs = zeros(Int, N)
+    for (i, s) in enumerate(state)
+        if s != 0
+            r = abs(i-s)
+            rs[r] += 1
+        end
+    end
+    return rs
+end
+

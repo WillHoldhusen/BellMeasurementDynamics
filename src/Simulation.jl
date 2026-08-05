@@ -40,13 +40,12 @@ end
 function simulate(N, T, p, alpha)
     r = 1:N
     weights = (N .- r).* (r.^(-alpha))
+    
     probabilities = weights/sum(weights)
+
     prob, alias = make_alias_table(probabilities)
-    x1s, x2s = sample_pair(prob, alias, T)
-
+    x1s, x2s = sample_pair_open(prob, alias, T)
     state = zeros(Int, N)
-    #states = zeros(Int, T, N)
-
     for t = 2:T
         x = rand()
         if x >= p
@@ -57,28 +56,46 @@ function simulate(N, T, p, alpha)
             s = rand(1:N)
             measure_one!(s, state)
         end
-        #states[t,:] = copy(state)
     end
-    # return states
     return state
 end
 
 function simulate_multiple(N, T, p, alpha, trials)
-    entropies = zeros(Int, trials)
+    # entropies = zeros(Int, N, trials)
+    # n1s = zeros(Int, threads)
+    states = zeros(Int, trials, N)
     for t in 1:trials
-        state = simulate(N, T, p, alpha)
-        entropies[t] = bonds_across(state, div(N, 2))
+        states[t,:] = simulate(N, T, p, alpha)
+        # for i in range(N)
+        #     entropies[i, t] = bonds_across(state, div(N, 2))
+        # end
+        # n1s[t] = unpaired_sites(state)
     end
-    entropy_avg = sum(entropies)/trials
-    return entropy_avg
+    # entropy_avg = zeros(N)
+    # for i in range(N)
+    #     entropy_avg[i] = sum(entropies[i,:])/trials
+    # end
+    # n1_avg = sum(n1s)/trials
+    # return entropy_avg, n1_avg
+    return states
 end
 
 function simulate_multiple_threaded(N, T, p, alpha, trials)
-    entropies = zeros(Int, trials)
+    # entropies = zeros(Int, N, trials)
+    # n1s = zeros(Int, threads)
+    states = zeros(Int, trials, N)
     Threads.@threads for t in 1:trials
-        state = simulate(N, T, p, alpha)
-        entropies[t] = bonds_across(state, div(N, 2))
+        states[t,:] = simulate(N, T, p, alpha)
+        # for i in range(N)
+        #     entropies[i, t] = bonds_across(state, div(N, 2))
+        # end
+        # n1s[t] = unpaired_sites(state)
     end
-    entropy_avg = sum(entropies)/trials
-    return entropy_avg
+    # entropy_avg = zeros(N)
+    # for i in range(N)
+    #     entropy_avg[i] = sum(entropies[i,:])/trials
+    # end
+    # n1_avg = sum(n1s)/trials
+    # return entropy_avg, n1_avg
+    return states
 end
