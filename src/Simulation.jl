@@ -1,4 +1,4 @@
-include("Entropy.jl")
+include("Metrics.jl")
 include("AliasTables.jl")
 
 
@@ -44,7 +44,7 @@ function simulate(N, T, p, alpha)
     probabilities = weights/sum(weights)
 
     prob, alias = make_alias_table(probabilities)
-    x1s, x2s = sample_pair_open(prob, alias, T)
+    x1s, x2s = sample_pair(prob, alias, T)
     state = zeros(Int, N)
     for t = 2:T
         x = rand()
