@@ -1,6 +1,3 @@
-include("Metrics.jl")
-include("AliasTables.jl")
-
 function measure_one!(s::Int, state::Vector{Int})
     j = state[s]
     if j != 0
@@ -95,14 +92,23 @@ function simulate_multiple(N::Int, T::Int, p::Float64, alpha::Float64, trials::I
     return states
 end
 
-function average_entropy_profile(N::Int, T::Int, p::Float64, alpha::Float64, trials::Int; periodic::Bool=false)
-    thread_profiles = [zeros(Int, N-1) for _ in 1:Threads.nthreads()]
+function average_entropy_profile(N::Int, T::Int, p::Float64, alpha::Float64, trials::Int; periodic::Bool=false, centered::Bool=true)
+    if centered
+        thread_profiles = [zeros(Int, div(N,2)) for _ in 1:Threads.nthreads()]
+    else
+        thread_profiles = [zeros(Int, N-1) for _ in 1:Threads.nthreads()]
+    end
+
     thread_states = [zeros(Int, N) for _ in 1:Threads.nthreads()]
     Threads.@threads for t in 1:trials
         rng = Xoshiro(1234+t) 
         state = thread_states[Threads.threadid()]
         state = simulate!(state, N, T, p, alpha; periodic=periodic, rng=rng)
-        entropy_profile!(thread_profiles[Threads.threadid()], state)
+        if centered
+            central_entropy_profile!(thread_profiles[Threads.threadid()], state)
+        else
+            entropy_profile!(thread_profiles[Threads.threadid()], state)
+        end
     end
     entropy_profile = sum(thread_profiles) / trials
     return entropy_profile

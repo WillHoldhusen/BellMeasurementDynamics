@@ -35,20 +35,58 @@ function entropy_profile!(old_profile, state)
 end
 
 
-function bonds_across(state::Vector{Int}, cut::Int)
-    return count(x -> x > cut, state[1:cut])
-end
-
-function bonds_outside(state::Vector{Int}, start::Int, finish::Int)
+function bonds_outside(state::Vector{Int}, lo::Int, hi::Int)
     bonds = 0
-    for s in state[start:finish]
-        if s > finish
-            bonds += 1
-        elseif s != 0 && s < start
+    for i in lo:hi
+        s = state[i]
+        if s != 0 && (s < lo || s > hi)
             bonds += 1
         end
     end
     return bonds
+end
+
+
+
+
+function is_outside(i, lo, hi)
+    if i != 0 && !(lo <= i <= hi)
+        return 1
+    else
+        return 0
+    end
+end
+
+function central_entropy_profile!(entropy::Vector{Int}, state::Vector{Int})
+    N = length(state)
+    lo = div(N, 2)
+    hi = lo + 1
+    entropy[1] += is_outside(state[lo], lo, hi)
+    entropy[1] += is_outside(state[hi], lo, hi)
+
+    for k in 2:div(N,2)
+        new_lo = lo - 1
+        new_hi = hi + 1
+
+        i = state[new_lo]
+        j = state[new_hi]
+
+        if i != 0
+            was_inside = lo <= i <= hi
+            is_inside = new_lo <= i <= new_hi
+            entropy[k] += entropy[k-1] - was_inside + !is_inside
+        else
+            entropy[k] += entropy[k-1]
+        end
+        if j != 0
+            was_inside = lo <= j <= hi
+            is_inside = new_lo <= j <= new_hi
+            entropy[k] += -was_inside + !is_inside
+        end
+        lo = new_lo
+        hi = new_hi
+    end
+    return entropy
 end
 
 function unpaired_sites(state::Vector{Int})
