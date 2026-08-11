@@ -46,9 +46,6 @@ function bonds_outside(state::Vector{Int}, lo::Int, hi::Int)
     return bonds
 end
 
-
-
-
 function is_outside(i, lo, hi)
     if i != 0 && !(lo <= i <= hi)
         return 1
@@ -61,7 +58,7 @@ function central_entropy_profile!(entropy::Vector{Int}, state::Vector{Int})
     N = length(state)
     lo = div(N, 2)
     hi = lo + 1
-    entropy[1] += is_outside(state[lo], lo, hi)
+    entropy[1] = is_outside(state[lo], lo, hi)
     entropy[1] += is_outside(state[hi], lo, hi)
 
     for k in 2:div(N,2)
@@ -74,9 +71,9 @@ function central_entropy_profile!(entropy::Vector{Int}, state::Vector{Int})
         if i != 0
             was_inside = lo <= i <= hi
             is_inside = new_lo <= i <= new_hi
-            entropy[k] += entropy[k-1] - was_inside + !is_inside
+            entropy[k] = entropy[k-1] - was_inside + !is_inside
         else
-            entropy[k] += entropy[k-1]
+            entropy[k] = entropy[k-1]
         end
         if j != 0
             was_inside = lo <= j <= hi
