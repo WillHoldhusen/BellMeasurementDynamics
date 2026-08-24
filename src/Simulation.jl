@@ -154,12 +154,64 @@ function average_entropy_profile(N::Int, T::Int, p::Float64, alpha::Float64, tri
             central_entropy_profile!(entropy, state)
             thread_profiles[Threads.threadid()] .+= entropy
         else
-            entropy = entropy_profile!(thread_profiles[Threads.threadid()], state)
+            entropy = add_entropy_profile!(thread_profiles[Threads.threadid()], state)
         end
     end
-    entropy_profile = sum(thread_profiles) / trials
+    entropy_profile = sum(thread_profiles)/trials
+    
     return entropy_profile
 end
+
+function get_entropies_and_stats(N::Int, T::Int, p::Float64, alpha::Float64, trials::Int; periodic::Bool=false)
+    thread_profiles = [zeros(Int, N-1) for _ in 1:Threads.nthreads()]
+    thread_entropy  = [zeros(Int, N-1) for _ in 1:Threads.nthreads()]
+    thread_S = [0 for _ in 1:Threads.nthreads()]
+    thread_S2 = [0 for _ in 1:Threads.nthreads()]
+
+    thread_N0 = [0 for _ in 1:Threads.nthreads()]
+    thread_N02 = [0 for _ in 1:Threads.nthreads()]
+
+    thread_states = [zeros(Int, N) for _ in 1:Threads.nthreads()]
+
+    thread_rs = [zeros(Int, N-1) for _ in 1:Threads.nthreads()]
+
+    Threads.@threads for t in 1:trials
+        tid = Threads.threadid()
+        #rng = Xoshiro(1234+t) 
+        rng = Xoshiro(12345678 + t)
+        state = thread_states[tid]
+        state = simulate!(state, N, T, p, alpha; periodic=periodic, rng=rng)
+        entropy = new_entropy_profile!(thread_entropy[tid], state)
+        thread_profiles[tid] .+= entropy
+        thread_S[tid] += entropy[div(N,2)]
+        thread_S2[tid] += entropy[div(N,2)]^2
+
+        N0 = count(iszero, state)
+        thread_N0[tid] += N0
+        thread_N02[tid] += N0^2
+
+        rs = count_rs(state)
+        thread_rs[tid] += rs
+    end
+    entropy_profile = sum(thread_profiles)/trials
+    S_sum  = sum(thread_S)
+    S2_sum = sum(thread_S2)
+
+    S_mean = S_sum / trials
+    S_var  = (S2_sum - trials * S_mean^2) / (trials - 1)
+    S_sem  = sqrt(S_var / trials)
+
+    N0_sum = sum(thread_N0)
+    N02_sum = sum(thread_N02)
+
+    N0_mean = N0_sum / trials
+    N0_var = (N02_sum - trials * N0_mean^2) / (trials - 1)
+    N0_sem = sqrt(N0_var / trials)
+
+    rs_mean = sum(thread_rs)/trials
+    return entropy_profile, S_mean, S_sem, N0_mean, N0_sem, rs_mean
+end
+
 
 function average_r_dist(N::Int, T::Int, p::Float64, alpha::Float64, trials::Int; periodic::Bool=false)
     thread_rs = [zeros(Int, N-1) for _ in 1:Threads.nthreads()]
@@ -174,3 +226,4 @@ function average_r_dist(N::Int, T::Int, p::Float64, alpha::Float64, trials::Int;
     end
     return sum(thread_rs)/trials
 end
+

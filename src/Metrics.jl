@@ -17,8 +17,26 @@ function entropy_profile(state)
 end
 
 
-function entropy_profile!(old_profile, state)
+function add_entropy_profile!(old_profile, state)
     N = length(state)
+    num_crossings = 0
+    for i in 1:N-1
+        j = state[i]
+        if j > i
+            # bond is crossing, add one
+            num_crossings += 1
+        elseif j != 0
+            # second site of bond is to the left, no longer crossing 
+            num_crossings -= 1
+        end
+        old_profile[i] += num_crossings
+    end
+    return old_profile
+end
+
+function new_entropy_profile!(old_profile, state)
+    N = length(state)
+    fill!(old_profile, 0)
     num_crossings = 0
     for i in 1:N-1
         j = state[i]
@@ -53,6 +71,7 @@ function is_outside(i, lo, hi)
         return 0
     end
 end
+
 
 function central_entropy_profile!(entropy::Vector{Int}, state::Vector{Int})
     N = length(state)
@@ -104,4 +123,16 @@ end
 
 function effective_exponents(Ns, SNs)
     return log.(SNs[2:end] ./ SNs[1:end-1]) ./ log.(Ns[2:end] ./ Ns[1:end-1])
+end
+
+function add_counts!(counts, state)
+    N = length(state)
+    for i in 1:N
+        j = state[i]
+        if j > i
+            r = j-i
+            counts[r, i] += 1
+        end
+    end
+    return counts
 end
