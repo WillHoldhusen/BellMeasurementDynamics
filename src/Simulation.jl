@@ -1,3 +1,6 @@
+using Random
+include("AliasTables.jl")
+
 function measure_one!(s::Int, state::Vector{Int})
     j = state[s]
     if j != 0
@@ -31,7 +34,9 @@ function measure_two!(s1::Int, s2::Int, state::Vector{Int})
     end
 end
 
-function simulate!(state::Vector{Int}, N::Int, T::Int, p::Float64, alpha::Float64; periodic::Bool=false, rng=Random.default_rng())
+function simulate!(state::Vector{Int}, N::Int, T::Int, p::Float64, alpha::Float64; 
+                   periodic::Bool=false, rng=Random.default_rng(),
+                   save_states::Bool=false)
     # TODO: precompute tables
     if periodic
         if iseven(N)
@@ -54,7 +59,11 @@ function simulate!(state::Vector{Int}, N::Int, T::Int, p::Float64, alpha::Float6
         prob, alias = make_alias_table(probabilities)
         x1s, x2s = sample_pair(prob, alias, T; rng=rng)
     end
-    fill!(state, 0) # reinitialize state
+    fill!(state, 0) # reinitialize 
+    if save_states
+        states = zeros(Int, N, T)
+        states[:,1] = copy(state)
+    end
     for t = 2:T
         x = rand(rng)
         if x >= p
@@ -65,8 +74,63 @@ function simulate!(state::Vector{Int}, N::Int, T::Int, p::Float64, alpha::Float6
             s = rand(rng, 1:N)
             measure_one!(s, state)
         end
+        if save_states
+            states[:,t] = copy(state)
+        end
     end
-    return state
+    if save_states
+        return state, states
+    else
+        return state
+    end
+end
+
+function simulate_time_series(N::Int, T::Int, p::Float64, alpha::Float64; 
+                              periodic::Bool=false, rng=Random.default_rng())
+    # TODO: precompute tables
+    state = zeros(Int, N)
+    N0 = zeros(Int, T)
+    N0[1] = N
+    S = zeros(Int, T)
+    if periodic
+        if iseven(N)
+            rmax = div(N, 2)
+        else
+            rmax = div(N-1, 2)
+        end
+        r = 1:rmax
+        weights = r.^(-alpha)    
+        if iseven(N)
+            weights[rmax] = weights[rmax]/2
+        end
+        probabilities = weights/sum(weights)
+        prob, alias = make_alias_table(probabilities)
+        x1s, x2s = sample_pair_periodic(N, prob, alias, T; rng=rng)
+    else
+        r = 1:N
+        weights = (N .- r).* (r.^(-alpha))
+        probabilities = weights/sum(weights)
+        prob, alias = make_alias_table(probabilities)
+        x1s, x2s = sample_pair(prob, alias, T; rng=rng)
+    end
+    for t = 2:T
+        x = rand(rng)
+        if x >= p
+            s1 = x1s[t]
+            s2 = x2s[t]
+            measure_two!(s1, s2, state)
+        else
+            s = rand(rng, 1:N)
+            measure_one!(s, state)
+        end
+        N0[t] = count(iszero, state)
+        c = 0
+        for i = 1:div(N,2)
+            c += state[i]>div(N,2)
+        end
+        S[t] = c
+    end
+    return N0, S
 end
 
 function simulate_track(N::Int, T::Int, p::Float64, alpha::Float64; periodic::Bool=false, rng=Random.default_rng())
@@ -135,6 +199,21 @@ function simulate_multiple(N::Int, T::Int, p::Float64, alpha::Float64, trials::I
         end
     end
     return states
+end
+
+function simulate_multiple_time_series(N::Int, T::Int, p::Float64, alpha::Float64, trials::Int; periodic::Bool=false)
+    N0s_thread = [zeros(Int, T) for _ in 1:Threads.nthreads()]
+    Ss_thread = [zeros(Int, T) for _ in 1:Threads.nthreads()]
+    Threads.@threads for t in 1:trials
+        tid = Threads.threadid()
+        rng = Xoshiro(1234+t)
+        N0, S = simulate_time_series(N, T, p, alpha; periodic=periodic, rng=rng)
+        N0s_thread[tid] .+= N0
+        Ss_thread[tid] .+= S
+    end
+    N0s = sum(N0s_thread) ./ trials
+    Ss = sum(Ss_thread) ./ trials
+    return N0s, Ss
 end
 
 function average_entropy_profile(N::Int, T::Int, p::Float64, alpha::Float64, trials::Int; periodic::Bool=false, centered::Bool=false)
@@ -226,4 +305,3 @@ function average_r_dist(N::Int, T::Int, p::Float64, alpha::Float64, trials::Int;
     end
     return sum(thread_rs)/trials
 end
-

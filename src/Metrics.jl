@@ -136,3 +136,15 @@ function add_counts!(counts, state)
     end
     return counts
 end
+
+function single_profile(state)
+    return return iszero.(state)
+end
+
+function single_correlation(state, i0)
+    correlation = zeros(Int, length(state))
+    for i in eachindex(state)
+        correlation[i] = iszero(state[i]) && iszero(state[i0])
+    end
+    return correlation
+end
